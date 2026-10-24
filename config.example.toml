@@ -1,0 +1,24 @@
+# Copy to config.toml. Secrets never go here: they belong in .env.
+# Environment variables override the settings below.
+
+mode = "monitor"            # or "claim"
+markets = "both"            # bhopp, bloxymarket or both
+poll_interval_seconds = 10
+max_daily_spend = 25        # dollars per UTC day, both sites together
+# max_claim_price = 50      # most per unit on any buy
+# max_claim_quantity = 10   # most units per buy
+
+[[watch]]
+item = "Harvester"
+max_price = 5               # dollars per unit
+
+[[watch]]
+item = "Harvester"
+market = "bloxymarket"      # a one-site entry beats the both-sites one
+max_price = 4.5
+
+[[watch]]
+item = "Chroma Seer"
+max_price = 1
+min_quantity = 3            # only when at least 3 fit
+max_quantity = 10           # at most 10 per buy

@@ -1,0 +1,9 @@
+services:
+  mm2claimer:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    stop_grace_period: 30s

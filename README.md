@@ -150,9 +150,23 @@ name and parses only those items; with more names it reads the whole market.
 
 ## Deploying on Railway
 
-The image `ghcr.io/reverseddata/definetely-allowed-auto-claimer:latest` is built and
-published by GitHub Actions on every push to `main` (see `docs/RAILWAY_TEMPLATE.md`
-for a one-click template).
+### One click
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/2trSRg?referralCode=YMdSJg&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
+1. Click the button and sign in to Railway.
+2. Fill in the three required variables: `DISCORD_WEBHOOK_URL`, `DISCORD_BOT_TOKEN`,
+   `DISCORD_MENTION_USER_ID` (see "From Discord" above). That is enough for
+   `monitor` mode. To buy, set `MODE=claim`, `BHOPP_TOKEN` and/or
+   `BLOXYMARKET_COOKIE` (see "Getting your sessions"), and a `MAX_DAILY_SPEND`.
+3. Deploy, then pick items with `/watch add` in Discord.
+
+It runs the published image `ghcr.io/reverseddata/definetely-allowed-auto-claimer:latest`
+with a volume on `/app/data` already attached. To update, redeploy the service.
+
+### By hand
+
+The image is built and published by GitHub Actions on every push to `main`.
 
 1. In Railway: **New Project → Empty Project → New → Docker Image**, and enter
    `ghcr.io/reverseddata/definetely-allowed-auto-claimer:latest`. (Or **Deploy from

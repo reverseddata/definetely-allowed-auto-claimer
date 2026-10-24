@@ -1,7 +1,8 @@
 # Railway template: what to enter
 
-For the maintainer: create the template once at https://railway.com/compose (or
-Workspace → Templates → New Template), then add its Deploy button to the README.
+The template exists: https://railway.com/deploy/2trSRg (Deploy button in the README).
+To change it: Railway → Workspace → Templates → mm2-claimer → Edit. To recreate it:
+Workspace → Templates → New, then update the README button.
 
 ## Service
 

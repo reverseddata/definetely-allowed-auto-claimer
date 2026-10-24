@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 from . import __version__
 from .claim import ClaimEngine
 from .config import Settings
-from .http import AuthError, HttpClient, RateLimited
+from .http import AuthError, HostLimit, HttpClient, RateLimited
 from .lock import InstanceLock
 from .marketplaces.base import MarketplaceAdapter
 from .models import ClaimStatus, Listing
@@ -333,10 +333,11 @@ class Watcher:
 
 def build_http(settings: Settings) -> HttpClient:
     # Short spacing for BHOPP: a buy makes 2-3 requests back to back and must not
-    # queue behind the poll. BloxyMarket rate-limits by IP, so it gets its own gap.
+    # queue behind the poll. BloxyMarket rate-limits by IP, so it gets a per-minute
+    # budget that lets one poll's searches go out as a quick burst.
     return HttpClient(min_host_interval=0.2, default_timeout=settings.request_timeout_seconds,
-                      host_intervals={"api.bloxymarket.com":
-                                      settings.bloxymarket_request_gap_seconds})
+                      host_limits={"api.bloxymarket.com":
+                                   HostLimit(settings.bloxymarket_requests_per_minute)})
 
 
 def build_adapter(settings: Settings, http: HttpClient, enabled=None) -> MarketplaceAdapter:

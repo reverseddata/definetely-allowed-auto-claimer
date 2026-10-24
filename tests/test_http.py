@@ -115,3 +115,33 @@ def test_per_host_gap():
             await c.request_json("GET", base + "/ok")
         assert time.monotonic() - t0 >= 0.4
     run(_with_server(t, host_intervals={"127.0.0.1": 0.2}))
+
+
+def test_budget_allows_a_burst_then_paces():
+    from mm2claimer.http import HostLimit
+
+    async def t(c, base):
+        t0 = time.monotonic()
+        for _ in range(3):                       # the burst: only min_gap apart
+            await c.request_json("GET", base + "/ok")
+        burst = time.monotonic() - t0
+        await c.request_json("GET", base + "/ok")  # budget used up: waits for a refill
+        paced = time.monotonic() - t0
+        assert 0.08 <= burst < 0.5, burst
+        # 120/min refills one every 0.5 s: the 4th waits for the part not refilled yet.
+        assert paced - burst >= 0.3, (burst, paced)
+    run(_with_server(t, host_limits={"127.0.0.1": HostLimit(120, burst=3, min_gap=0.05)}))
+
+
+def test_unspaced_request_skips_the_budget_wait_but_counts():
+    from mm2claimer.http import HostLimit
+
+    async def t(c, base):
+        await c.request_json("GET", base + "/ok")          # uses the only token
+        t0 = time.monotonic()
+        await c.request_json("GET", base + "/ok", spaced=False)
+        assert time.monotonic() - t0 < 0.3                  # did not wait
+        t0 = time.monotonic()
+        await c.request_json("GET", base + "/ok")           # repays both: waits ~1 s
+        assert time.monotonic() - t0 >= 0.8
+    run(_with_server(t, host_limits={"127.0.0.1": HostLimit(60, burst=1, min_gap=0.0)}))

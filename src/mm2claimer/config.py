@@ -128,7 +128,9 @@ class Settings:
     # A poll searches the sites for each watched name while the watchlist is this
     # short; with more names it reads the whole market instead.
     search_query_limit: int = 6
-    bloxymarket_request_gap_seconds: float = 3.0  # BloxyMarket rate-limits by IP
+    # BloxyMarket rate-limits by IP over a sustained window. sniper_bot ran for months at
+    # ~38 requests/min (bursts of 9 at 0.4 s) and got blocked at ~78/min.
+    bloxymarket_requests_per_minute: float = 36.0
 
     # Sessions, read from env only. Never logged.
     bhopp_token: str = field(default="", repr=False)
@@ -319,9 +321,9 @@ def load_settings(config_file: str | os.PathLike | None = None,
                                     "BALANCE_REFRESH_SECONDS", 30.0, minimum=5.0)
     s.search_query_limit = whole(pick("SEARCH_QUERY_LIMIT", "search_query_limit"),
                                  "SEARCH_QUERY_LIMIT", 6)
-    s.bloxymarket_request_gap_seconds = flt(
-        pick("BLOXYMARKET_REQUEST_GAP_SECONDS", "bloxymarket_request_gap_seconds"),
-        "BLOXYMARKET_REQUEST_GAP_SECONDS", 3.0)
+    s.bloxymarket_requests_per_minute = flt(
+        pick("BLOXYMARKET_REQUESTS_PER_MINUTE", "bloxymarket_requests_per_minute"),
+        "BLOXYMARKET_REQUESTS_PER_MINUTE", 36.0, minimum=1.0)
 
     def limit(value, name) -> Decimal | None:
         """Per-item price limit. 0 is a real number here, not "off": a max_price of 0

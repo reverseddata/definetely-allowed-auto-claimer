@@ -131,10 +131,12 @@ you watch at most `SEARCH_QUERY_LIMIT` (6) names, a poll searches the site for e
 name and parses only those items; with more names it reads the whole market.
 
 * BHOPP answers fast; requests are spaced 0.2 s apart.
-* BloxyMarket rate-limits by IP: requests are spaced `BLOXYMARKET_REQUEST_GAP_SECONDS`
-  (default 3) apart, so with 3 watched names each is checked every ~9 s. Going lower
-  risks a block (1 s got an IP blocked before). A purchase skips the gap: it never
-  waits behind a poll. On a 429 only BloxyMarket backs off.
+* BloxyMarket rate-limits by IP over a sustained window, so its requests share a budget
+  of `BLOXYMARKET_REQUESTS_PER_MINUTE` (default 36, just under the ~38/min that ran for
+  months; ~78/min got an IP blocked). Up to 9 go out as a quick burst, 0.4 s apart, so
+  a poll of a few names is done in a couple of seconds. Sustained, each watched name
+  is one request: with 3 names an item is checked about every 5 s, with 6 names every
+  10 s. A purchase never waits for the budget. On a 429 only BloxyMarket backs off.
 
 ## Commands
 

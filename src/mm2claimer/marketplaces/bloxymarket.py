@@ -15,8 +15,8 @@ Monitoring (verified live 2026-10-25, public, no login):
     polls, when the cheapest price rises to them.
 
     The API rate-limits by IP over a sustained window (429 until it cools down), so
-    requests to it are spaced (BLOXYMARKET_REQUEST_GAP_SECONDS) and a 429 backs this
-    market off on its own.
+    requests to it share a per-minute budget (BLOXYMARKET_REQUESTS_PER_MINUTE, bursts
+    allowed) and a 429 backs this market off on its own.
 
 Buying (read from the site's JavaScript 2026-10-25; not yet run against a live
 account, so the first real buy is the test):

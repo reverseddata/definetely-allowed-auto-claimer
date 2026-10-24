@@ -118,12 +118,48 @@ def parse_retry_after(value: str | None, default: float = DEFAULT_RETRY_AFTER) -
     return max(1.0, min(MAX_RETRY_AFTER, secs))
 
 
+@dataclass(frozen=True)
+class HostLimit:
+    """A request budget for one host: on average `per_minute`, in bursts of up to
+    `burst` requests at least `min_gap` seconds apart. For sites that rate-limit by
+    a sustained window (BloxyMarket) rather than by the gap between two requests."""
+    per_minute: float
+    burst: int = 9
+    min_gap: float = 0.4
+
+
+class _Bucket:
+    def __init__(self, limit: HostLimit):
+        self.limit = limit
+        self.tokens = float(limit.burst)
+        self.stamp = time.monotonic()
+        self.next_ok = 0.0
+
+    def refill(self, now: float):
+        rate = self.limit.per_minute / 60.0
+        self.tokens = min(float(self.limit.burst), self.tokens + (now - self.stamp) * rate)
+        self.stamp = now
+
+    def wait_time(self, now: float) -> float:
+        self.refill(now)
+        rate = self.limit.per_minute / 60.0
+        short = 0.0 if self.tokens >= 1 else (1 - self.tokens) / rate
+        return max(short, self.next_ok - now)
+
+    def take(self, now: float):
+        self.refill(now)
+        self.tokens -= 1          # may go below 0 for an unspaced request: repaid later
+        self.next_ok = now + self.limit.min_gap
+
+
 class HttpClient:
     def __init__(self, *, min_host_interval: float = 1.0, default_timeout: float = 20.0,
-                 user_agent: str = USER_AGENT, host_intervals: dict[str, float] | None = None):
+                 user_agent: str = USER_AGENT, host_intervals: dict[str, float] | None = None,
+                 host_limits: dict[str, HostLimit] | None = None):
         self.min_host_interval = min_host_interval
-        # Per-host overrides: BloxyMarket rate-limits by IP and needs a wider gap.
+        # Per-host fixed gaps, and per-host budgets (which win over a gap).
         self.host_intervals = dict(host_intervals or {})
+        self._buckets = {h: _Bucket(l) for h, l in (host_limits or {}).items()}
         self.default_timeout = default_timeout
         self.user_agent = user_agent
         self._session: aiohttp.ClientSession | None = None
@@ -145,11 +181,26 @@ class HttpClient:
             await self._session.close()
         self._session = None
 
-    async def _space(self, host: str):
-        """Wait until the host's minimum gap has passed since the last request to it."""
+    async def _space(self, host: str, spaced: bool = True):
+        """Wait for the host's budget (or its minimum gap since the last request).
+        Unspaced requests never wait, but still count against a budget."""
+        name = urlsplit(f"//{host}").hostname or host
+        bucket = self._buckets.get(name)
+        if bucket is not None:
+            if spaced:
+                lock = self._host_locks.setdefault(host, asyncio.Lock())
+                async with lock:
+                    wait = bucket.wait_time(time.monotonic())
+                    if wait > 0:
+                        await asyncio.sleep(wait)
+                    bucket.take(time.monotonic())
+            else:
+                bucket.take(time.monotonic())
+            return
+        if not spaced:
+            return
         lock = self._host_locks.setdefault(host, asyncio.Lock())
-        gap = self.host_intervals.get(urlsplit(f"//{host}").hostname or host,
-                                      self.min_host_interval)
+        gap = self.host_intervals.get(name, self.min_host_interval)
         async with lock:
             now = time.monotonic()
             wait = self._host_next.get(host, 0.0) - now
@@ -162,11 +213,10 @@ class HttpClient:
                            headers: dict[str, str] | None = None,
                            timeout: float | None = None,
                            etag: str | None = None, spaced: bool = True) -> HttpResult:
-        """`spaced=False` skips the per-host gap: for the one purchase request, which
-        must not wait seconds behind the poll that found the item."""
+        """`spaced=False` skips the per-host wait: for the one purchase request, which
+        must not wait behind the poll that found the item."""
         host = urlsplit(url).netloc
-        if spaced:
-            await self._space(host)
+        await self._space(host, spaced)
         hdrs = dict(headers or {})
         if etag:
             hdrs["If-None-Match"] = etag
